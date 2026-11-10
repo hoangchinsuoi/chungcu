@@ -15,6 +15,11 @@ import {
   ComplaintStatus,
   ServiceRequest,
   ParcelItem,
+  ServiceConfig,
+  ServiceConfigAudit,
+  AIWorkTaskSuggestion,
+  SubscriptionPackage,
+  TenantInvitation,
 } from './types';
 import {
   TENANTS_DATA,
@@ -29,6 +34,11 @@ import {
   INITIAL_BOOKINGS,
   INITIAL_SERVICE_REQUESTS,
   INITIAL_PARCELS,
+  INITIAL_SERVICE_CONFIGS,
+  INITIAL_SERVICE_CONFIG_AUDITS,
+  INITIAL_AI_WORK_SUGGESTIONS,
+  INITIAL_SUBSCRIPTION_PACKAGES,
+  INITIAL_TENANT_INVITATIONS,
 } from './data/mockData';
 import { Sidebar, NavTab } from './components/layout/Sidebar';
 import { Topbar } from './components/layout/Topbar';
@@ -37,6 +47,8 @@ import { ApartmentManagement } from './components/apartments/ApartmentManagement
 import { ResidentManagement } from './components/residents/ResidentManagement';
 import { BillingManagement } from './components/billing/BillingManagement';
 import { ComplaintKanban } from './components/complaints/ComplaintKanban';
+import { AIWorkAssistant } from './components/work-assistant/AIWorkAssistant';
+import { ServiceConfigView } from './components/services-config/ServiceConfigView';
 import { ServiceRequestsView } from './components/services/ServiceRequestsView';
 import { ResidentHandbook } from './components/handbook/ResidentHandbook';
 import { StaffManagement } from './components/staff/StaffManagement';
@@ -74,6 +86,16 @@ export default function App() {
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>(INITIAL_SERVICE_REQUESTS);
   const [parcels, setParcels] = useState<ParcelItem[]>(INITIAL_PARCELS);
 
+  // US15 & AI Work Assistant State
+  const [serviceConfigs, setServiceConfigs] = useState<ServiceConfig[]>(INITIAL_SERVICE_CONFIGS);
+  const [serviceAudits, setServiceAudits] = useState<ServiceConfigAudit[]>(INITIAL_SERVICE_CONFIG_AUDITS);
+  const [aiSuggestions, setAiSuggestions] = useState<AIWorkTaskSuggestion[]>(INITIAL_AI_WORK_SUGGESTIONS);
+  const [isLoadingAIWork, setIsLoadingAIWork] = useState(false);
+
+  // Super Admin: Commercial Policy & Tenant Management State
+  const [packages, setPackages] = useState<SubscriptionPackage[]>(INITIAL_SUBSCRIPTION_PACKAGES);
+  const [tenantInvitations, setTenantInvitations] = useState<TenantInvitation[]>(INITIAL_TENANT_INVITATIONS);
+
   // Global search & UI
   const [searchQuery, setSearchQuery] = useState('');
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
@@ -95,6 +117,14 @@ export default function App() {
     }
   };
 
+  // Multi-tenant Access Guard:
+  // Condominium Owners (Chủ chung cư) & other tenant roles cannot access the SaaS super_admin tab
+  React.useEffect(() => {
+    if (currentRole !== 'superadmin' && activeTab === 'super_admin') {
+      setActiveTab('dashboard');
+    }
+  }, [currentRole, activeTab]);
+
   // Auth Handlers
   const handleLoginSuccess = (user: UserAccount) => {
     setCurrentUser(user);
@@ -109,10 +139,19 @@ export default function App() {
   };
 
   const handleRegisterTenantSuccess = (newTenant: Partial<TenantCondo>, user: UserAccount) => {
+    const slugGen = (newTenant.slug || newTenant.name || 'tenant')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-');
+
     const fullTenant: TenantCondo = {
       id: `tenant-${Date.now()}`,
       name: newTenant.name || 'Dự án mới',
       code: newTenant.code || 'NEW',
+      slug: slugGen,
       address: newTenant.address || 'TP. Hồ Chí Minh',
       totalApartments: newTenant.totalApartments || 300,
       occupancyRate: 90.0,
@@ -432,30 +471,504 @@ export default function App() {
     setBookings((prev) => [bk, ...prev]);
   };
 
-  // Tenant Handlers
+  // ==========================================
+  // SUPER ADMIN: TENANT & COMMERCIAL POLICY HANDLERS (Diagrams 1 & 2)
+  // ==========================================
   const handleAddTenant = (newTenant: Partial<TenantCondo>) => {
+    const slugGen = (newTenant.slug || newTenant.name || 'tenant')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-');
+
     const tenant: TenantCondo = {
       id: `tenant-${Date.now()}`,
       name: newTenant.name || '',
-      code: newTenant.code || 'COND',
-      address: newTenant.address || '',
+      code: (newTenant.code || 'COND').toUpperCase(),
+      slug: slugGen,
+      address: newTenant.address || 'TP. Hồ Chí Minh',
       totalApartments: newTenant.totalApartments || 300,
+      totalFloors: newTenant.totalFloors || 25,
+      totalBlocks: newTenant.totalBlocks || 2,
       occupancyRate: 90.0,
-      activeResidents: newTenant.activeResidents || 800,
+      activeResidents: Math.round((newTenant.totalApartments || 300) * 2.5),
       managerName: newTenant.managerName || 'Ban Quản trị',
+      managerEmail: newTenant.managerEmail,
+      managerPhone: newTenant.managerPhone,
       status: 'active',
       package: newTenant.package || 'Professional',
+      packageId: newTenant.packageId || 'pkg-pro',
       monthlyFee: newTenant.monthlyFee || 11000000,
       createdAt: new Date().toISOString().split('T')[0],
+      legalInfo: newTenant.legalInfo || {
+        companyName: `Ban Quản Trị ${newTenant.name || 'Chung Cư'}`,
+        taxCode: '0300000000',
+        representativeName: newTenant.managerName || 'Đại diện hợp pháp',
+        representativeTitle: 'Trưởng BQT',
+        representativePhone: newTenant.managerPhone || '0900000000',
+        representativeEmail: newTenant.managerEmail || 'rep@condo.vn',
+      },
+      contactInfo: newTenant.contactInfo || {
+        hotline: '1900 6868',
+        supportEmail: 'support@condo.vn',
+        officeLocation: 'Tầng 1 Sảnh chính',
+        workingHours: '08:00 - 17:30 (Thứ 2 - Thứ 7)',
+      },
     };
-    setTenants((prev) => [...prev, tenant]);
+
+    setTenants((prev) => [tenant, ...prev]);
     setCurrentTenant(tenant);
+  };
+
+  const handleUpdateTenant = (tenantId: string, updated: Partial<TenantCondo>) => {
+    setTenants((prev) =>
+      prev.map((t) => (t.id === tenantId ? { ...t, ...updated } : t))
+    );
+    if (currentTenant.id === tenantId) {
+      setCurrentTenant((prev) => ({ ...prev, ...updated }));
+    }
+  };
+
+  // Diagram 2 - Tạm ngưng Tenant
+  const handleSuspendTenant = (tenantId: string, reason: string) => {
+    const timestamp = new Date().toLocaleString('vi-VN');
+    setTenants((prev) =>
+      prev.map((t) =>
+        t.id === tenantId
+          ? {
+              ...t,
+              status: 'suspended',
+              suspensionReason: reason,
+              suspendedAt: timestamp,
+              suspendedBy: currentUser.name,
+            }
+          : t
+      )
+    );
+    if (currentTenant.id === tenantId) {
+      setCurrentTenant((prev) => ({
+        ...prev,
+        status: 'suspended',
+        suspensionReason: reason,
+        suspendedAt: timestamp,
+        suspendedBy: currentUser.name,
+      }));
+    }
+  };
+
+  // Diagram 2 - Khôi phục Tenant
+  const handleRestoreTenant = (tenantId: string) => {
+    const timestamp = new Date().toLocaleString('vi-VN');
+    setTenants((prev) =>
+      prev.map((t) =>
+        t.id === tenantId
+          ? {
+              ...t,
+              status: 'active',
+              restoredAt: timestamp,
+              restoredBy: currentUser.name,
+              suspensionReason: undefined,
+            }
+          : t
+      )
+    );
+    if (currentTenant.id === tenantId) {
+      setCurrentTenant((prev) => ({
+        ...prev,
+        status: 'active',
+        restoredAt: timestamp,
+        restoredBy: currentUser.name,
+        suspensionReason: undefined,
+      }));
+    }
+  };
+
+  // Diagram 1 - Quản lý chính sách thương mại: Tạo gói bản quyền
+  const handleAddPackage = (newPkg: Omit<SubscriptionPackage, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const timestamp = new Date().toISOString().split('T')[0];
+    const pkg: SubscriptionPackage = {
+      ...newPkg,
+      id: `pkg-${Date.now().toString().slice(-4)}`,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    setPackages((prev) => [...prev, pkg]);
+  };
+
+  // Diagram 1 - Cập nhật thông tin gói
+  const handleUpdatePackage = (packageId: string, updated: Partial<SubscriptionPackage>) => {
+    const timestamp = new Date().toISOString().split('T')[0];
+    setPackages((prev) =>
+      prev.map((p) =>
+        p.id === packageId
+          ? {
+              ...p,
+              ...updated,
+              updatedAt: timestamp,
+            }
+          : p
+      )
+    );
+  };
+
+  // Diagram 1 - Ngừng kinh doanh gói
+  const handleDiscontinuePackage = (packageId: string, reason: string) => {
+    const timestamp = new Date().toLocaleString('vi-VN');
+    setPackages((prev) =>
+      prev.map((p) =>
+        p.id === packageId
+          ? {
+              ...p,
+              status: 'discontinued',
+              discontinuedReason: reason,
+              discontinuedAt: timestamp,
+              discontinuedBy: currentUser.name,
+              updatedAt: new Date().toISOString().split('T')[0],
+            }
+          : p
+      )
+    );
+  };
+
+  // Diagram 1 - Mở bán lại gói
+  const handleReactivatePackage = (packageId: string) => {
+    setPackages((prev) =>
+      prev.map((p) =>
+        p.id === packageId
+          ? {
+              ...p,
+              status: 'active',
+              discontinuedReason: undefined,
+              discontinuedAt: undefined,
+              discontinuedBy: undefined,
+              updatedAt: new Date().toISOString().split('T')[0],
+            }
+          : p
+      )
+    );
+  };
+
+  // Diagram 2 - Mời Tenant Admin
+  const handleInviteTenantAdmin = (
+    invitation: Omit<TenantInvitation, 'id' | 'sentAt' | 'status' | 'invitationCode' | 'invitationLink'>
+  ) => {
+    const targetTenant = tenants.find((t) => t.id === invitation.tenantId);
+    const code = `INV-${(targetTenant?.code || 'TEN').toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const link = `https://${targetTenant?.slug || 'tenant'}.ezcondo.vn/invite?code=${code}`;
+
+    const newInvite: TenantInvitation = {
+      ...invitation,
+      id: `inv-${Date.now()}`,
+      invitationCode: code,
+      invitationLink: link,
+      sentAt: `${new Date().toLocaleDateString('vi-VN')} ${new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`,
+      status: 'pending',
+    };
+
+    setTenantInvitations((prev) => [newInvite, ...prev]);
+  };
+
+  const handleResendInvitation = (invitationId: string) => {
+    setTenantInvitations((prev) =>
+      prev.map((inv) =>
+        inv.id === invitationId
+          ? {
+              ...inv,
+              sentAt: `${new Date().toLocaleDateString('vi-VN')} ${new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} (Gửi lại)`,
+            }
+          : inv
+      )
+    );
+  };
+
+  // ==========================================
+  // AI WORK ASSISTANT HANDLERS (Manager Work Delegation & Prioritization)
+  // Constraint: AI suggestions are NEVER automatically applied without manager confirmation.
+  // Acceptance criteria: Accept, Edit before apply, Dismiss.
+  // ==========================================
+  const handleApplySuggestion = (suggestionId: string) => {
+    const target = aiSuggestions.find((s) => s.id === suggestionId);
+    if (!target) return;
+
+    const timestamp = new Date().toLocaleString('vi-VN');
+
+    // Update suggestion status
+    setAiSuggestions((prev) =>
+      prev.map((s) =>
+        s.id === suggestionId
+          ? {
+              ...s,
+              status: 'accepted',
+              decidedAt: timestamp,
+              decidedBy: currentUser.name,
+            }
+          : s
+      )
+    );
+
+    // Apply changes to matching Complaint if linked
+    if (target.ticketId) {
+      setComplaints((prev) =>
+        prev.map((c) => {
+          if (c.ticketCode === target.ticketId || c.title.includes(target.taskTitle)) {
+            return {
+              ...c,
+              priority: target.suggestedPriority,
+              assignedTo: target.suggestedAssignee.staffName,
+              deadline: target.suggestedDeadline,
+              status: c.status === 'new' ? 'in_progress' : c.status,
+              updatedAt: timestamp,
+              messages: [
+                ...c.messages,
+                {
+                  id: `msg-${Date.now()}`,
+                  senderName: currentUser.name,
+                  senderRole: 'Ban Quản lý',
+                  content: `[AI Phân công đã duyệt] Đã giao việc cho ${target.suggestedAssignee.staffName} (${target.suggestedAssignee.role}). Hạn chót: ${target.suggestedDeadline}. Căn cứ: ${target.basisInfo}`,
+                  timestamp,
+                },
+              ],
+            };
+          }
+          return c;
+        })
+      );
+    }
+  };
+
+  const handleEditAndApplySuggestion = (
+    suggestionId: string,
+    updatedData: {
+      suggestedPriority: Complaint['priority'];
+      suggestedAssignee: {
+        staffId: string;
+        staffName: string;
+        role: string;
+        department: string;
+      };
+      suggestedDeadline: string;
+      actionSteps: string[];
+      userDecisionNotes?: string;
+    }
+  ) => {
+    const target = aiSuggestions.find((s) => s.id === suggestionId);
+    if (!target) return;
+
+    const timestamp = new Date().toLocaleString('vi-VN');
+
+    // Update suggestion state with manager customization
+    setAiSuggestions((prev) =>
+      prev.map((s) =>
+        s.id === suggestionId
+          ? {
+              ...s,
+              ...updatedData,
+              status: 'edited',
+              decidedAt: timestamp,
+              decidedBy: currentUser.name,
+            }
+          : s
+      )
+    );
+
+    // Apply edited values to matching Complaint if linked
+    if (target.ticketId) {
+      setComplaints((prev) =>
+        prev.map((c) => {
+          if (c.ticketCode === target.ticketId || c.title.includes(target.taskTitle)) {
+            return {
+              ...c,
+              priority: updatedData.suggestedPriority,
+              assignedTo: updatedData.suggestedAssignee.staffName,
+              deadline: updatedData.suggestedDeadline,
+              status: c.status === 'new' ? 'in_progress' : c.status,
+              updatedAt: timestamp,
+              messages: [
+                ...c.messages,
+                {
+                  id: `msg-${Date.now()}`,
+                  senderName: currentUser.name,
+                  senderRole: 'Ban Quản lý',
+                  content: `[Quản lý đã hiệu chỉnh đề xuất AI] Phân công: ${updatedData.suggestedAssignee.staffName}. Hạn xử lý: ${updatedData.suggestedDeadline}. Ghi chú: "${updatedData.userDecisionNotes || 'Đã duyệt'}"`,
+                  timestamp,
+                },
+              ],
+            };
+          }
+          return c;
+        })
+      );
+    }
+  };
+
+  const handleDismissSuggestion = (suggestionId: string, reason?: string) => {
+    const timestamp = new Date().toLocaleString('vi-VN');
+    setAiSuggestions((prev) =>
+      prev.map((s) =>
+        s.id === suggestionId
+          ? {
+              ...s,
+              status: 'dismissed',
+              userDecisionNotes: reason || 'Bỏ qua bởi Quản lý',
+              decidedAt: timestamp,
+              decidedBy: currentUser.name,
+            }
+          : s
+      )
+    );
+    // Explicit constraint: no modifications made to complaints, shift, or system tasks.
+  };
+
+  const handleRefreshAIWorkSuggestions = async () => {
+    setIsLoadingAIWork(true);
+    try {
+      const res = await fetch('/api/ai/manager-work-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          condoName: currentTenant.name,
+          openComplaints: complaints.filter(
+            (c) => c.status === 'new' || c.status === 'in_progress'
+          ),
+          staffList: staff,
+          pendingRequests: serviceRequests.filter((r) => r.status === 'Chờ duyệt'),
+          overdueCount: invoices.filter((i) => i.status === 'overdue').length,
+        }),
+      });
+      const data = await res.json();
+      if (data.suggestions && Array.isArray(data.suggestions)) {
+        // Merge without losing previously accepted/dismissed records
+        const newItems: AIWorkTaskSuggestion[] = data.suggestions.filter(
+          (item: AIWorkTaskSuggestion) => !aiSuggestions.some((exist) => exist.taskTitle === item.taskTitle)
+        );
+        setAiSuggestions((prev) => [...newItems, ...prev]);
+      }
+    } catch (err) {
+      console.error('Failed to refresh AI suggestions:', err);
+    } finally {
+      setIsLoadingAIWork(false);
+    }
+  };
+
+  // ==========================================
+  // US15 - SERVICE CONFIG & PRICING HANDLERS
+  // Constraint: New pricing configuration only applies to future invoices based on effective date;
+  // past invoices remain intact. Full audit trail recorded.
+  // ==========================================
+  const handleAddService = (newService: Omit<ServiceConfig, 'id' | 'updatedAt' | 'updatedBy'>) => {
+    const timestamp = new Date().toLocaleString('vi-VN');
+    const serviceId = `svc-${Date.now().toString().slice(-4)}`;
+
+    const createdService: ServiceConfig = {
+      ...newService,
+      id: serviceId,
+      updatedAt: timestamp,
+      updatedBy: currentUser.name,
+    };
+
+    setServiceConfigs((prev) => [createdService, ...prev]);
+
+    // Append to Audit Trail
+    const auditRecord: ServiceConfigAudit = {
+      id: `aud-${Date.now()}`,
+      serviceId,
+      serviceCode: createdService.serviceCode,
+      serviceName: createdService.name,
+      changedAt: timestamp,
+      changedBy: `${currentUser.name} (${currentUser.role === 'manager' ? 'Quản lý' : 'Ban Quản trị'})`,
+      changeType: 'create',
+      newPrice: createdService.unitPrice,
+      reason: 'Khai báo dịch vụ mới theo quyết định Ban Quản lý',
+    };
+    setServiceAudits((prev) => [auditRecord, ...prev]);
+  };
+
+  const handleUpdateService = (
+    serviceId: string,
+    updatedData: Partial<ServiceConfig>,
+    reason: string
+  ) => {
+    const prevService = serviceConfigs.find((s) => s.id === serviceId);
+    if (!prevService) return;
+
+    const timestamp = new Date().toLocaleString('vi-VN');
+
+    // Build field changes for audit
+    const fieldChanges: ServiceConfigAudit['fieldChanges'] = [];
+    if (updatedData.unitPrice !== undefined && updatedData.unitPrice !== prevService.unitPrice) {
+      fieldChanges.push({
+        field: 'unitPrice',
+        fieldLabel: 'Đơn giá dịch vụ',
+        oldValue: prevService.unitPrice,
+        newValue: updatedData.unitPrice,
+      });
+    }
+    if (updatedData.unit && updatedData.unit !== prevService.unit) {
+      fieldChanges.push({
+        field: 'unit',
+        fieldLabel: 'Đơn vị tính',
+        oldValue: prevService.unit,
+        newValue: updatedData.unit,
+      });
+    }
+    if (updatedData.status && updatedData.status !== prevService.status) {
+      fieldChanges.push({
+        field: 'status',
+        fieldLabel: 'Trạng thái áp dụng',
+        oldValue: prevService.status,
+        newValue: updatedData.status,
+      });
+    }
+    if (updatedData.effectiveDate && updatedData.effectiveDate !== prevService.effectiveDate) {
+      fieldChanges.push({
+        field: 'effectiveDate',
+        fieldLabel: 'Ngày hiệu lực',
+        oldValue: prevService.effectiveDate,
+        newValue: updatedData.effectiveDate,
+      });
+    }
+
+    // Update service config
+    setServiceConfigs((prev) =>
+      prev.map((s) =>
+        s.id === serviceId
+          ? {
+              ...s,
+              ...updatedData,
+              updatedAt: timestamp,
+              updatedBy: currentUser.name,
+            }
+          : s
+      )
+    );
+
+    // Append to Audit Trail
+    const auditRecord: ServiceConfigAudit = {
+      id: `aud-${Date.now()}`,
+      serviceId,
+      serviceCode: prevService.serviceCode,
+      serviceName: updatedData.name || prevService.name,
+      changedAt: timestamp,
+      changedBy: `${currentUser.name} (${currentUser.role === 'manager' ? 'Quản lý' : 'Ban Quản trị'})`,
+      changeType:
+        updatedData.unitPrice !== undefined && updatedData.unitPrice !== prevService.unitPrice
+          ? 'update_price'
+          : 'update_general',
+      oldPrice: prevService.unitPrice,
+      newPrice: updatedData.unitPrice !== undefined ? updatedData.unitPrice : prevService.unitPrice,
+      fieldChanges,
+      reason,
+    };
+    setServiceAudits((prev) => [auditRecord, ...prev]);
   };
 
   const openComplaintsCount = complaints.filter(
     (c) => c.status === 'new' || c.status === 'in_progress' || c.status === 'waiting_resident'
   ).length;
   const overdueInvoicesCount = invoices.filter((i) => i.status === 'overdue').length;
+  const pendingAISuggestionsCount = aiSuggestions.filter((s) => s.status === 'pending').length;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 antialiased">
@@ -467,6 +980,7 @@ export default function App() {
         currentRole={currentRole}
         openComplaintsCount={openComplaintsCount}
         overdueInvoicesCount={overdueInvoicesCount}
+        pendingAISuggestionsCount={pendingAISuggestionsCount}
       />
 
       {/* Main Content Area */}
@@ -543,6 +1057,35 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'ai_work_assistant' && (
+            <AIWorkAssistant
+              currentTenant={currentTenant}
+              currentRole={currentRole}
+              suggestions={aiSuggestions}
+              staffList={staff}
+              openComplaints={complaints.filter(
+                (c) => c.status === 'new' || c.status === 'in_progress'
+              )}
+              overdueInvoicesCount={overdueInvoicesCount}
+              onApplySuggestion={handleApplySuggestion}
+              onEditAndApplySuggestion={handleEditAndApplySuggestion}
+              onDismissSuggestion={handleDismissSuggestion}
+              onRefreshFromAI={handleRefreshAIWorkSuggestions}
+              isLoadingAI={isLoadingAIWork}
+            />
+          )}
+
+          {activeTab === 'service_config' && (
+            <ServiceConfigView
+              currentTenant={currentTenant}
+              currentRole={currentRole}
+              serviceConfigs={serviceConfigs}
+              serviceAudits={serviceAudits}
+              onAddService={handleAddService}
+              onUpdateService={handleUpdateService}
+            />
+          )}
+
           {activeTab === 'services' && (
             <ServiceRequestsView
               currentRole={currentRole}
@@ -594,8 +1137,20 @@ export default function App() {
 
           {activeTab === 'super_admin' && (
             <SuperAdminView
+              currentRole={currentRole}
               tenants={tenants}
+              packages={packages}
+              tenantInvitations={tenantInvitations}
               onAddTenant={handleAddTenant}
+              onUpdateTenant={handleUpdateTenant}
+              onSuspendTenant={handleSuspendTenant}
+              onRestoreTenant={handleRestoreTenant}
+              onAddPackage={handleAddPackage}
+              onUpdatePackage={handleUpdatePackage}
+              onDiscontinuePackage={handleDiscontinuePackage}
+              onReactivatePackage={handleReactivatePackage}
+              onInviteTenantAdmin={handleInviteTenantAdmin}
+              onResendInvitation={handleResendInvitation}
             />
           )}
         </main>

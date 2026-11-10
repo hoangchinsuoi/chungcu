@@ -492,12 +492,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         title="Đề Xuất Ưu Tiên Vận Hành Trong Ngày"
         maxWidth="max-w-2xl"
         footer={
-          <button
-            onClick={() => setShowAIPrioritiesModal(false)}
-            className="rounded-lg bg-blue-700 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-800 transition"
-          >
-            Đóng
-          </button>
+          <div className="flex items-center justify-between w-full">
+            <button
+              onClick={() => {
+                setShowAIPrioritiesModal(false);
+                onNavigate('ai_work_assistant');
+              }}
+              className="rounded-lg bg-blue-700 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-800 transition flex items-center gap-1.5"
+            >
+              <span>Mở AI Hỗ trợ công việc & Phân công</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => setShowAIPrioritiesModal(false)}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition"
+            >
+              Đóng
+            </button>
+          </div>
         }
       >
         <div className="space-y-4">

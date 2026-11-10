@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   FileCheck,
   BookOpen,
+  Sparkles,
+  Sliders,
 } from 'lucide-react';
 import { TenantCondo, UserRole } from '../../types';
 
@@ -22,6 +24,8 @@ export type NavTab =
   | 'residents'
   | 'billing'
   | 'complaints'
+  | 'ai_work_assistant'
+  | 'service_config'
   | 'services'
   | 'handbook'
   | 'staff'
@@ -36,6 +40,7 @@ interface SidebarProps {
   currentRole: UserRole;
   openComplaintsCount: number;
   overdueInvoicesCount: number;
+  pendingAISuggestionsCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -45,6 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentRole,
   openComplaintsCount,
   overdueInvoicesCount,
+  pendingAISuggestionsCount = 0,
 }) => {
   const navItems = [
     {
@@ -82,6 +88,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       roles: ['owner', 'manager', 'staff', 'resident', 'superadmin'],
     },
     {
+      id: 'ai_work_assistant' as NavTab,
+      label: 'AI Hỗ trợ công việc',
+      icon: Sparkles,
+      badge: pendingAISuggestionsCount > 0 ? `${pendingAISuggestionsCount} chờ` : undefined,
+      badgeColor: 'bg-blue-50 text-blue-700 border border-blue-200',
+      roles: ['owner', 'manager', 'superadmin'],
+    },
+    {
+      id: 'service_config' as NavTab,
+      label: 'Cấu hình dịch vụ (US15)',
+      icon: Sliders,
+      roles: ['owner', 'manager', 'superadmin'],
+    },
+    {
       id: 'services' as NavTab,
       label: 'Dịch vụ & Bưu kiện',
       icon: FileCheck,
@@ -116,7 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'super_admin' as NavTab,
       label: 'Quản trị hệ thống (SaaS)',
       icon: Shield,
-      roles: ['superadmin', 'owner', 'manager'],
+      roles: ['superadmin'], // Chỉ Quản trị viên nền tảng mới được sử dụng
     },
   ];
 
@@ -142,9 +162,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="mx-3 mt-3 rounded-xl bg-slate-50 p-3 border border-slate-200/80">
         <div className="flex items-center justify-between text-[11px] text-slate-500">
           <span>Tòa nhà đang chọn:</span>
-          <span className="flex items-center gap-1 text-emerald-600 font-medium">
-            <CheckCircle2 className="h-3 w-3" /> Đang vận hành
-          </span>
+          {currentTenant.status === 'suspended' ? (
+            <span className="flex items-center gap-1 text-rose-600 font-bold">
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-600 animate-pulse" /> Tạm ngưng
+            </span>
+          ) : currentTenant.status === 'trial' ? (
+            <span className="flex items-center gap-1 text-amber-600 font-medium">
+              Dùng thử
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-emerald-600 font-medium">
+              <CheckCircle2 className="h-3 w-3" /> Đang vận hành
+            </span>
+          )}
         </div>
         <p className="mt-1 font-semibold text-xs text-slate-900 truncate">{currentTenant.name}</p>
         <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-200/60">
@@ -161,20 +191,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           Chức năng
         </div>
 
-        {navItems.map((item) => {
-          const isActive = activeTab === item.id;
-          const isRoleAllowed = item.roles.includes(currentRole);
+        {navItems
+          .filter((item) => item.roles.includes(currentRole))
+          .map((item) => {
+            const isActive = activeTab === item.id;
 
-          return (
-            <button
-              key={item.id}
-              onClick={() => onSelectTab(item.id)}
-              className={`group flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
-                isActive
-                  ? 'bg-blue-50 text-blue-700 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              } ${!isRoleAllowed ? 'opacity-50' : ''}`}
-            >
+            return (
+              <button
+                key={item.id}
+                onClick={() => onSelectTab(item.id)}
+                className={`group flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition ${
+                  isActive
+                    ? 'bg-blue-50 text-blue-700 font-semibold'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
               <div className="flex items-center gap-2.5">
                 <item.icon
                   className={`h-4 w-4 transition ${

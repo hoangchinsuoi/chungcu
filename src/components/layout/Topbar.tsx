@@ -142,7 +142,14 @@ export const Topbar: React.FC<TopbarProps> = ({
                     }`}
                   >
                     <div>
-                      <div className="font-medium text-slate-900">{tenant.name}</div>
+                      <div className="flex items-center gap-1.5 font-medium text-slate-900">
+                        <span>{tenant.name}</span>
+                        {tenant.status === 'suspended' && (
+                          <span className="rounded bg-rose-100 text-rose-700 px-1.5 py-0.5 text-[9px] font-bold">
+                            Tạm ngưng
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[11px] text-slate-400">
                         {tenant.totalApartments} căn • Mã {tenant.code}
                       </div>

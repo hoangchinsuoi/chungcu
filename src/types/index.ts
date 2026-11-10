@@ -1,18 +1,82 @@
 export type UserRole = 'owner' | 'manager' | 'staff' | 'resident' | 'superadmin';
 
+export interface TenantLegalInfo {
+  companyName: string; // Tên pháp nhân đại diện (CĐT / Ban Quản trị / Đơn vị vận hành)
+  taxCode: string; // Mã số thuế (MST)
+  representativeName: string; // Họ tên người đại diện pháp luật
+  representativeTitle: string; // Chức vụ
+  representativePhone: string;
+  representativeEmail: string;
+}
+
+export interface TenantContactInfo {
+  hotline: string; // Hotline Ban Quản Lý (24/7)
+  supportEmail: string; // Email tiếp nhận
+  officeLocation: string; // Văn phòng BQL tại chung cư
+  workingHours: string; // Giờ làm việc
+}
+
+export interface TenantInvitation {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  email: string;
+  fullName: string;
+  phone: string;
+  role: 'manager' | 'owner';
+  status: 'pending' | 'accepted' | 'expired';
+  invitationCode: string;
+  invitationLink: string;
+  sentAt: string;
+  invitedBy: string;
+  notes?: string;
+  acceptedAt?: string;
+}
+
+export interface SubscriptionPackage {
+  id: string;
+  code: string; // e.g. PKG-STD, PKG-PRO, PKG-ENT
+  name: string; // Gói Standard, Gói Professional, Gói Enterprise
+  tagline: string;
+  monthlyPrice: number;
+  annualDiscountPercent: number; // e.g. 15%
+  maxApartments: number; // 300, 600, 99999
+  status: 'active' | 'discontinued' | 'draft';
+  isPopular?: boolean;
+  features: string[];
+  discontinuedReason?: string;
+  discontinuedAt?: string;
+  discontinuedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TenantCondo {
   id: string;
   name: string;
   code: string;
+  slug: string; // Slug cho tenant: mtd, vcp-p6 -> mtd.ezcondo.vn
   address: string;
   totalApartments: number;
+  totalFloors?: number;
+  totalBlocks?: number;
   occupancyRate: number;
   activeResidents: number;
   managerName: string;
+  managerEmail?: string;
+  managerPhone?: string;
   status: 'active' | 'trial' | 'suspended';
-  package: 'Standard' | 'Professional' | 'Enterprise';
+  suspensionReason?: string;
+  suspendedAt?: string;
+  suspendedBy?: string;
+  restoredAt?: string;
+  restoredBy?: string;
+  package: string;
+  packageId?: string;
   monthlyFee: number;
   createdAt: string;
+  legalInfo?: TenantLegalInfo;
+  contactInfo?: TenantContactInfo;
 }
 
 export type ApartmentStatus = 'vacant' | 'occupied' | 'maintenance' | 'for_sale';
@@ -246,4 +310,71 @@ export interface ParcelItem {
   receivedAt?: string;
   lockerNumber?: string;
 }
+
+// US15 - Cấu hình dịch vụ & Biểu phí
+export type ServiceStatus = 'active' | 'inactive' | 'draft';
+export type ServiceCategory = 'Quản lý vận hành' | 'Trông giữ xe' | 'Điện nước tiện ích' | 'Dịch vụ cư dân' | 'Thi công & Ký quỹ';
+
+export interface ServiceConfig {
+  id: string;
+  serviceCode: string;
+  name: string;
+  category: ServiceCategory;
+  description: string;
+  unit: string; // m²/tháng, xe/tháng, m³, lượt, lần, căn/tháng
+  unitPrice: number; // >= 0
+  vatRate: number; // % (e.g. 10 or 8 or 0)
+  status: ServiceStatus;
+  effectiveDate: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface ServiceConfigAudit {
+  id: string;
+  serviceId: string;
+  serviceCode: string;
+  serviceName: string;
+  changedAt: string;
+  changedBy: string;
+  changeType: 'create' | 'update_price' | 'update_status' | 'update_general';
+  oldPrice?: number;
+  newPrice?: number;
+  fieldChanges?: {
+    field: string;
+    fieldLabel: string;
+    oldValue: string | number;
+    newValue: string | number;
+  }[];
+  reason: string; // Bắt buộc khi điều chỉnh
+}
+
+// AI Hỗ trợ công việc cho Quản lý
+export type AISuggestionStatus = 'pending' | 'accepted' | 'edited' | 'dismissed';
+
+export interface AIWorkTaskSuggestion {
+  id: string;
+  ticketId?: string; // liên kết Complaint hoặc ServiceRequest nếu có
+  taskTitle: string;
+  category: 'Kỹ thuật - Sự cố' | 'Vận hành - Dịch vụ' | 'Tài chính - Công nợ' | 'Nhân sự - Ca trực' | 'PCCC & An toàn';
+  targetApartment?: string;
+  currentStatus: string;
+  suggestedPriority: ComplaintPriority;
+  suggestedAssignee: {
+    staffId: string;
+    staffName: string;
+    role: string;
+    department: string;
+  };
+  suggestedDeadline: string; // e.g. "Hôm nay trước 11:30"
+  actionSteps: string[];
+  reasoning: string; // Lý do đề xuất
+  basisInfo: string; // Căn cứ kỹ thuật, SLA quy định, ca trực hiện tại
+  status: AISuggestionStatus;
+  userDecisionNotes?: string;
+  decidedAt?: string;
+  decidedBy?: string;
+}
+
 

@@ -261,7 +261,152 @@ Hãy trả lời ngắn gọn, niềm nở, ân cần, giải thích rõ ràng v
   }
 });
 
+// API: AI Work Management Assistant for Condominium Managers
+// Accepts authorized operations data, returns assignment, priority, action steps with rational basis
+app.post('/api/ai/manager-work-assistant', async (req, res) => {
+  const { condoName, openComplaints = [], staffList = [], pendingRequests = [], overdueCount = 0 } = req.body;
+
+  if (!ai) {
+    // High-quality smart offline fallback
+    const suggestions = [
+      {
+        id: `sug-${Date.now()}-1`,
+        ticketId: openComplaints[0]?.ticketCode || 'TK-2026-089',
+        taskTitle: openComplaints[0]?.title || 'Sự cố tụt áp lực nước trục đứng Block A (Tầng 12 - 18)',
+        category: 'Kỹ thuật - Sự cố',
+        targetApartment: openComplaints[0]?.apartmentCode || 'A-1204, A-1402',
+        currentStatus: 'Mới tiếp nhận - Chưa phân công',
+        suggestedPriority: 'urgent',
+        suggestedAssignee: {
+          staffId: staffList[0]?.id || 'st-1',
+          staffName: staffList[0]?.name || 'Nguyễn Văn Hùng',
+          role: staffList[0]?.role || 'Kỹ sư trưởng',
+          department: 'Kỹ thuật',
+        },
+        suggestedDeadline: 'Hôm nay trước 11:30 (SLA khẩn cấp: 90 phút)',
+        actionSteps: [
+          'Kiểm tra rơ-le áp suất và van giảm áp trục B2 tại phòng máy kỹ thuật tầng 15',
+          'Khóa van nhánh cục bộ để kiểm tra hiện tượng rò rỉ hoặc e-bọt khí',
+          'Báo cáo hiện trạng và ghi nhận biên bản nghiệm thu áp lực đạt chuẩn 2.5 bar',
+        ],
+        reasoning: 'Áp lực nước ảnh hưởng trực tiếp đến sinh hoạt của 24 căn hộ dọc trục đứng, nguy cơ phát sinh thêm khiếu nại nếu kéo dài.',
+        basisInfo: 'Căn cứ: 3 phản ánh cư dân trùng giờ; Kỹ sư trưởng có ca trực Ca 1 và chuyên môn hệ thống thủy lực tòa nhà.',
+        status: 'pending',
+      },
+      {
+        id: `sug-${Date.now()}-2`,
+        ticketId: 'REQ-CONSTRUCT-04',
+        taskTitle: 'Thẩm định hồ sơ & Giám sát thi công nội thất căn hộ B-0802',
+        category: 'Vận hành - Dịch vụ',
+        targetApartment: 'B-0802',
+        currentStatus: 'Chờ duyệt phương án thi công',
+        suggestedPriority: 'high',
+        suggestedAssignee: {
+          staffId: staffList[1]?.id || 'st-2',
+          staffName: staffList[1]?.name || 'Trần Đình Trọng',
+          role: staffList[1]?.role || 'Kỹ thuật viên Điện nước',
+          department: 'Kỹ thuật',
+        },
+        suggestedDeadline: 'Trước 14:00 chiều nay',
+        actionSteps: [
+          'Kiểm tra sơ đồ đi dây điện âm tường và đường ống cấp thoát nước trong bản vẽ',
+          'Thu tiền ký quỹ thi công (30.000.000 đ) và cấp thẻ ra vào cho 4 công nhân nhà thầu',
+          'Ký cam kết không khoan đục vào khung giờ yên tĩnh (11:30 - 13:30)',
+        ],
+        reasoning: 'Cư dân đã nộp hồ sơ trước 48h theo quy định, cần phê duyệt kịp thời để nhà thầu triển khai đúng tiến độ cam kết.',
+        basisInfo: 'Căn cứ: Quy chế thi công tòa nhà điều 12; Kỹ thuật viên phụ trách giám sát kết cấu tầng 8 Block B.',
+        status: 'pending',
+      },
+      {
+        id: `sug-${Date.now()}-3`,
+        ticketId: 'FIN-OVERDUE-08',
+        taskTitle: 'Đôn đốc và xử lý công nợ phí dịch vụ tồn đọng đợt 1',
+        category: 'Tài chính - Công nợ',
+        targetApartment: '8 căn hộ quá hạn > 45 ngày',
+        currentStatus: 'Chưa thanh toán kỳ 09/2026',
+        suggestedPriority: 'medium',
+        suggestedAssignee: {
+          staffId: staffList[3]?.id || 'st-4',
+          staffName: staffList[3]?.name || 'Đỗ Thị Kim Ngân',
+          role: staffList[3]?.role || 'Kế toán tòa nhà',
+          department: 'Tài chính',
+        },
+        suggestedDeadline: 'Trước 17:00 ngày mai',
+        actionSteps: [
+          'Trích xuất danh sách công nợ chi tiết kèm thông tin liên lạc chủ sở hữu',
+          'Gửi thông báo nhắc nợ tự động qua Cổng Cư Dân & SMS Brandname',
+          'Gọi điện xác nhận lý do chậm nộp đối với 3 căn hộ có số tiền nợ trên 10 triệu đồng',
+        ],
+        reasoning: 'Tổng dư nợ 42.500.000 đ cần thu hồi trước kỳ chốt sổ tài chính để đảm bảo dòng tiền chi trả nhà thầu vệ sinh và bảo vệ.',
+        basisInfo: 'Căn cứ: Quy trình quản lý công nợ SOP-TC-02; Phụ trách bởi Kế toán tòa nhà.',
+        status: 'pending',
+      },
+    ];
+
+    return res.json({ success: true, source: 'offline-smart-engine', suggestions });
+  }
+
+  try {
+    const prompt = `Bạn là Trợ lý AI Phân tích & Hỗ trợ Công việc dành riêng cho Ban Quản Lý chung cư EZCondo.
+Chung cư: ${condoName || 'Masteri Thảo Điền'}.
+Dữ liệu công việc quản lý hiện hành:
+- Khiếu nại/Sự cố đang mở: ${JSON.stringify(openComplaints.slice(0, 5))}
+- Nhân sự hiện có & Chức danh: ${JSON.stringify(staffList.slice(0, 6))}
+- Yêu cầu dịch vụ/thi công chờ duyệt: ${JSON.stringify(pendingRequests.slice(0, 4))}
+- Số hóa đơn quá hạn: ${overdueCount}
+
+Yêu cầu:
+Phân tích dữ liệu thực tế trên và đưa ra 3 - 4 đề xuất sắp xếp công việc, phân công người xử lý phù hợp nhất (theo chuyên môn và ca trực), xác định mức độ ưu tiên (urgent, high, medium, low) và các bước xử lý cụ thể.
+Đặc biệt, MỖI ĐỀ XUẤT PHẢI CÓ CĂN CỨ RÕ RÀNG (basisInfo) và LÝ DO PHÂN TÍCH (reasoning).
+Lưu ý: Bạn chỉ gợi ý. Quyết định cuối cùng và việc thực thi thuộc về Quản lý.
+
+Trả về mảng JSON thuần túy (không markdown):
+[
+  {
+    "id": "sug-...",
+    "ticketId": "Mã phiếu hoặc mã công việc",
+    "taskTitle": "Tên công việc ngắn gọn, rõ ràng",
+    "category": "Kỹ thuật - Sự cố" | "Vận hành - Dịch vụ" | "Tài chính - Công nợ" | "Nhân sự - Ca trực" | "PCCC & An toàn",
+    "targetApartment": "Căn hộ liên quan (nếu có)",
+    "currentStatus": "Trạng thái hiện tại",
+    "suggestedPriority": "urgent" | "high" | "medium" | "low",
+    "suggestedAssignee": {
+      "staffId": "id nhân sự gợi ý",
+      "staffName": "Tên nhân sự",
+      "role": "Chức danh",
+      "department": "Bộ phận"
+    },
+    "suggestedDeadline": "Thời hạn hoàn thành đề xuất (ví dụ: Hôm nay trước 11:30)",
+    "actionSteps": ["Bước 1...", "Bước 2...", "Bước 3..."],
+    "reasoning": "Lý do vì sao đề xuất này quan trọng",
+    "basisInfo": "Căn cứ kỹ thuật, số lượng hộ ảnh hưởng, nhân viên có ca trực phù hợp hoặc quy định SLA"
+  }
+]`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const parsed = JSON.parse(response.text?.trim() || '[]');
+    const formatted = parsed.map((item: any, idx: number) => ({
+      ...item,
+      id: item.id || `sug-${Date.now()}-${idx}`,
+      status: 'pending',
+    }));
+
+    res.json({ success: true, source: 'gemini', suggestions: formatted });
+  } catch (error: any) {
+    console.error('Gemini Manager Assistant error:', error);
+    res.status(500).json({ error: error.message || 'Lỗi xử lý AI' });
+  }
+});
+
 // Setup Vite middlewares in development or serve static in production
+
 async function startServer() {
   if (!isProd) {
     const vite = await createViteServer({
